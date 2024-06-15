@@ -37,11 +37,11 @@ pub fn main() !void {
         const req = reqBuf[0..reqBytes];
         if (req.len == 0) continue;
 
-        const header = try parseHeader(req);
-        const path = try parsePath(header.requestLine);
-        const content = openLocalFile(path) catch |err| {
+        const headers = try parseHeaders(req);
+        const path = try parsePath(headers.requestLine);
+        const content = localFileGetContent(path) catch |err| {
             if (err == error.FileNotFound) {
-                _ = try conn.stream.writer().write(http404());
+                _ = try conn.stream.writer().write(notFound());
                 continue;
             } else return err;
         };
@@ -53,8 +53,7 @@ pub fn main() !void {
             "Content-Length: {}\r\n" ++
             "\r\n";
 
-        // write the response to the stream
-        _ = try conn.stream.writer().print(httpHead, .{ mimeForPath(path), content.len });
+        _ = try conn.stream.writer().print(httpHead, .{ getMimeFromPath(path), content.len });
         _ = try conn.stream.writer().write(content);
     } else |err| {
         std.debug.print("error in accept: {}\n", .{err});
@@ -82,7 +81,7 @@ const HTTPHeader = struct {
     }
 };
 
-pub fn parseHeader(header: []const u8) !HTTPHeader {
+pub fn parseHeaders(header: []const u8) !HTTPHeader {
     var hs = HTTPHeader{
         .requestLine = undefined,
         .host = undefined,
@@ -127,7 +126,7 @@ pub fn parsePath(requestLine: []const u8) ![]const u8 {
     return path;
 }
 
-pub fn openLocalFile(path: []const u8) ![]u8 {
+pub fn localFileGetContent(path: []const u8) ![]u8 {
     const localPath = path[1..];
 
     const file = try fs.cwd().openFile(localPath, .{});
@@ -138,7 +137,7 @@ pub fn openLocalFile(path: []const u8) ![]u8 {
     return try file.readToEndAlloc(memory, maxSize);
 }
 
-pub fn http404() []const u8 {
+pub fn notFound() []const u8 {
     return "HTTP/1.1 404 NOT FOUND \r\n" ++
         "Connection: close\r\n" ++
         "Content-Type: text/html; charset=utf8\r\n" ++
@@ -147,7 +146,7 @@ pub fn http404() []const u8 {
         "YOU ARE A QUICHE EATER";
 }
 
-pub fn mimeForPath(path: []const u8) []const u8 {
+pub fn getMimeFromPath(path: []const u8) []const u8 {
     const extension = std.fs.path.extension(path);
 
     inline for (mimeTypes) |kv| {
