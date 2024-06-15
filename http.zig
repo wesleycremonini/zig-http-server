@@ -2,7 +2,6 @@ const std = @import("std");
 const net = std.net;
 const fs = std.fs;
 const mem = std.mem;
-const expect = std.testing.expect;
 
 pub const ServeFileError = error{
     HeaderMalformed,
